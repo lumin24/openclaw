@@ -71,4 +71,34 @@ describe("AgentSession retry delay", () => {
     expect(session.retryCount).toBe(1);
     expect(emittedDelay).toBe(2000); // Falls back to base delay since infinity is ignored
   });
+
+  it("surfaces immediately (returns false) if retryAfterSeconds exceeds max SDK wait", async () => {
+    let emittedDelay = -1;
+    const session = {
+      retryCount: 0,
+      settingsManager: {
+        getRetrySettings: () => ({ enabled: true, maxRetries: 3, baseDelayMs: 2000 }),
+      },
+      emit: (event: any) => {
+        if (event.type === "auto_retry_start") {
+          emittedDelay = event.delayMs;
+        }
+      },
+      delay: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+      agent: { state: { messages: [] } },
+    } as unknown as AgentSession;
+
+    const callPromise = AgentSession.prototype["prepareRetry"].call(session, {
+      role: "assistant",
+      stopReason: "error",
+      status: 429,
+      retryAfterSeconds: 61, // default cap is 60s
+    } as unknown as AssistantMessage);
+
+    const result = await callPromise;
+
+    expect(result).toBe(false); // abort retry immediately
+    expect(session.retryCount).toBe(0); // restored for failover
+    expect(emittedDelay).toBe(-1); // no delay emitted
+  });
 });

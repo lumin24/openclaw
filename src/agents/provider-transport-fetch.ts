@@ -483,7 +483,7 @@ export function parseRetryAfterSeconds(headers: Headers): number | undefined {
   return Math.max(0, (retryAt - Date.now()) / 1000);
 }
 
-function resolveMaxSdkRetryWaitSeconds(): number | undefined {
+export function resolveMaxSdkRetryWaitSeconds(): number | undefined {
   const raw = process.env.OPENCLAW_SDK_RETRY_MAX_WAIT_SECONDS?.trim();
   if (!raw) {
     return DEFAULT_MAX_SDK_RETRY_WAIT_SECONDS;

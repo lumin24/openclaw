@@ -39,6 +39,7 @@ import type {
   PersistedUserTurnMessage,
   UserTurnTranscriptRecorder,
 } from "../../sessions/user-turn-transcript.types.js";
+import { resolveMaxSdkRetryWaitSeconds } from "../provider-transport-fetch.js";
 import type {
   Agent,
   AgentEvent,
@@ -2691,6 +2692,13 @@ export class AgentSession {
       message.retryAfterSeconds > 0
     ) {
       const requestedDelayMs = message.retryAfterSeconds * 1000;
+      const maxWaitSeconds = resolveMaxSdkRetryWaitSeconds();
+
+      if (maxWaitSeconds !== undefined && requestedDelayMs > maxWaitSeconds * 1000) {
+        this.retryCount--;
+        return false;
+      }
+
       if (requestedDelayMs > delayMs) {
         delayMs = requestedDelayMs;
       }
