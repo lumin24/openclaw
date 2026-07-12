@@ -2704,6 +2704,12 @@ export class AgentSession {
       }
     }
 
+    const MAX_NODE_TIMEOUT = 2147483647;
+    if (delayMs > MAX_NODE_TIMEOUT) {
+      this.retryCount--;
+      return false;
+    }
+
     this.emit({
       type: "auto_retry_start",
       attempt: this.retryCount,

@@ -101,4 +101,39 @@ describe("AgentSession retry delay", () => {
     expect(session.retryCount).toBe(0); // restored for failover
     expect(emittedDelay).toBe(-1); // no delay emitted
   });
+
+  it("surfaces immediately with a timer-safe bound if SDK max wait is disabled and retryAfter is huge", async () => {
+    let emittedDelay = -1;
+    const session = {
+      retryCount: 0,
+      settingsManager: {
+        getRetrySettings: () => ({ enabled: true, maxRetries: 3, baseDelayMs: 2000 }),
+      },
+      emit: (event: any) => {
+        if (event.type === "auto_retry_start") {
+          emittedDelay = event.delayMs;
+        }
+      },
+      delay: (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)),
+      agent: { state: { messages: [] } },
+    } as unknown as AgentSession;
+
+    // Simulate disabling the max wait cap
+    process.env.OPENCLAW_SDK_RETRY_MAX_WAIT_SECONDS = "0";
+
+    const callPromise = AgentSession.prototype["prepareRetry"].call(session, {
+      role: "assistant",
+      stopReason: "error",
+      status: 429,
+      retryAfterSeconds: 2147484, // ~2.14m seconds (exceeds 2147483647 ms)
+    } as unknown as AssistantMessage);
+
+    const result = await callPromise;
+
+    expect(result).toBe(false); // abort retry immediately due to MAX_NODE_TIMEOUT
+    expect(session.retryCount).toBe(0); // restored for failover
+    expect(emittedDelay).toBe(-1); // no delay emitted
+
+    delete process.env.OPENCLAW_SDK_RETRY_MAX_WAIT_SECONDS;
+  });
 });
